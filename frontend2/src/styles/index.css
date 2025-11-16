@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-dark-bg text-white overflow-hidden;
+  }
+}
+
+@layer utilities {
+  .starfield {
+    background-image: 
+      radial-gradient(2px 2px at 20px 30px, #eee, transparent),
+      radial-gradient(2px 2px at 60px 70px, rgba(255,255,255,0.8), transparent),
+      radial-gradient(1px 1px at 50px 50px, #fff, transparent),
+      radial-gradient(1px 1px at 80px 10px, rgba(255,255,255,0.6), transparent),
+      radial-gradient(2px 2px at 90px 40px, rgba(255,255,255,0.4), transparent),
+      radial-gradient(1px 1px at 130px 80px, #fff, transparent),
+      radial-gradient(1px 1px at 160px 30px, rgba(255,255,255,0.6), transparent);
+    background-repeat: repeat;
+    background-size: 200px 100px;
+    animation: starfield 20s linear infinite;
+  }
+
+  @keyframes starfield {
+    from {
+      background-position: 0 0;
+    }
+    to {
+      background-position: 200px 100px;
+    }
+  }
+
+  .message-enter {
+    animation: messageEnter 0.3s ease-out;
+  }
+
+  @keyframes messageEnter {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
