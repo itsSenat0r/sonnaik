@@ -6,23 +6,19 @@ import InputPanel from '../components/InputPanel';
 import { useAuth } from '../contexts/AuthContext';
 
 function MainPage() {
-  const { user } = useAuth(); // Получаем информацию о пользователе из контекста
+  const { user } = useAuth();
   const { chats, activeChatId, messages, selectChat, sendMessage, createNewChat, deleteChat, isLoaded } = useChat(user?.username);
+
+  // Убеждаемся, что chats - это массив
+  const safeChats = Array.isArray(chats) ? chats : [];
+  // Убеждаемся, что messages - это массив
+  const safeMessages = Array.isArray(messages) ? messages : [];
 
   return (
     <div className="flex h-screen bg-dark-bg">
-      {/* Левая панель */}
-      <ChatList
-        chats={chats}
-        activeChatId={activeChatId}
-        onSelectChat={selectChat}
-        onCreateNewChat={createNewChat}
-        onDeleteChat={deleteChat}
-      />
-
-      {/* Центральная область с диалогом */}
+      <ChatList chats={safeChats} activeChatId={activeChatId} onSelectChat={selectChat} onCreateNewChat={createNewChat} onDeleteChat={deleteChat} />
       <div className="flex-1 relative starfield">
-        <ChatArea messages={messages} />
+        <ChatArea messages={safeMessages} />
         <InputPanel onSendMessage={sendMessage} />
       </div>
     </div>
@@ -30,4 +26,3 @@ function MainPage() {
 }
 
 export default MainPage;
-

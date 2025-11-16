@@ -22,14 +22,16 @@ const ChatArea = ({ messages }) => {
       {/* Область сообщений */}
       <div className="flex-1 overflow-y-auto px-6 py-8 pb-32">
         <div className="max-w-4xl mx-auto">
-          {messages.length === 0 ? (
+          {!messages || messages.length === 0 ? (
             <div className="text-center text-gray-400 mt-20">
               <p className="text-lg">Начните диалог, чтобы получить интерпретацию вашего сна</p>
             </div>
           ) : (
-            messages.map((message) => (
-              <Message key={message.id} message={message} />
-            ))
+            messages
+              .filter(msg => msg && msg.id) // Фильтруем некорректные сообщения
+              .map((message) => (
+                <Message key={message.id} message={message} />
+              ))
           )}
           <div ref={messagesEndRef} />
         </div>

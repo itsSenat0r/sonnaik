@@ -55,8 +55,8 @@ const LoginForm = () => {
         // Регистрация
         register(username.trim(), email.trim(), password);
       } else {
-        // Вход
-        login(username.trim());
+        // Вход - передаем пароль, если он введен
+        await login(username.trim(), password || undefined, email.trim() || undefined);
       }
       
       // Переход на главную страницу после успешного входа/регистрации

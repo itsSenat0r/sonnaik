@@ -20,26 +20,31 @@ export const useChatStorage = (username) => {
       return;
     }
 
-    try {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        const parsedChats = JSON.parse(stored);
-        // Валидация данных
-        if (Array.isArray(parsedChats)) {
-          setChatsState(parsedChats);
+    const loadChats = () => {
+      try {
+        // Загружаем из localStorage
+        const stored = localStorage.getItem(storageKey);
+        if (stored) {
+          const parsedChats = JSON.parse(stored);
+          // Валидация данных
+          if (Array.isArray(parsedChats)) {
+            setChatsState(parsedChats);
+          } else {
+            console.warn('Некорректный формат истории чатов, создаём пустой массив');
+            setChatsState([]);
+          }
         } else {
-          console.warn('Некорректный формат истории чатов, создаём пустой массив');
           setChatsState([]);
         }
-      } else {
+      } catch (error) {
+        console.error('Ошибка при загрузке истории чатов:', error);
         setChatsState([]);
+      } finally {
+        setIsLoaded(true);
       }
-    } catch (error) {
-      console.error('Ошибка при загрузке истории чатов:', error);
-      setChatsState([]);
-    } finally {
-      setIsLoaded(true);
-    }
+    };
+
+    loadChats();
   }, [username, storageKey]);
 
   // Функция для обновления чатов с автоматическим сохранением
@@ -47,9 +52,15 @@ export const useChatStorage = (username) => {
     setChatsState((prevChats) => {
       let newChats;
       if (typeof updater === 'function') {
-        newChats = updater(prevChats);
+        newChats = updater(Array.isArray(prevChats) ? prevChats : []);
       } else {
         newChats = updater;
+      }
+
+      // Убеждаемся, что newChats - это массив
+      if (!Array.isArray(newChats)) {
+        console.warn('setChats получил не массив, преобразуем в пустой массив');
+        newChats = [];
       }
 
       // Сохраняем в localStorage только если username есть и данные загружены
@@ -65,10 +76,16 @@ export const useChatStorage = (username) => {
     });
   }, [username, storageKey, isLoaded]);
 
+  // Функция для удаления чата
+  const deleteChat = useCallback(async (chatId) => {
+    // Удаление происходит через setChats, который автоматически сохраняет в localStorage
+  }, []);
+
   return {
     chats,
     setChats,
     isLoaded,
+    deleteChat,
   };
 };
 

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useChatStorage } from './useChatStorage';
 
 // Функция для генерации уникального ID
@@ -14,14 +14,21 @@ const generateChatTitle = (text) => {
 };
 
 export const useChat = (username) => {
-  // Используем хук для работы с localStorage
-  const { chats: storedChats, setChats, isLoaded } = useChatStorage(username);
+  const { chats: storedChats, setChats, isLoaded, deleteChat: deleteChatFromStorage } = useChatStorage(username);
   
   const [activeChatId, setActiveChatId] = useState(null);
   const [messages, setMessages] = useState([]);
 
   // Синхронизируем messages при изменении активного чата или загрузке истории
+  // Используем ref для отслеживания, обновляем ли мы сообщения вручную
+  const isUpdatingMessagesRef = useRef(false);
+  
   useEffect(() => {
+    // Не синхронизируем, если мы обновляем сообщения вручную (во время streaming)
+    if (isUpdatingMessagesRef.current) {
+      return;
+    }
+    
     if (isLoaded && activeChatId) {
       const chat = storedChats.find(c => c.id === activeChatId);
       setMessages(chat?.messages || []);
@@ -93,58 +100,124 @@ export const useChat = (username) => {
       });
     });
 
-    // Генерируем ответ ассистента через небольшую задержку
-    setTimeout(() => {
-      const assistantMessage = {
-        id: `assistant-${Date.now()}`,
-        type: 'assistant',
-        text: generateMockResponse(text),
-        timestamp: new Date().toISOString(),
-      };
-      
-      // Добавляем сообщение ассистента в локальное состояние
-      setMessages(prev => [...prev, assistantMessage]);
-      
-      // Обновляем чат с ответом ассистента с автоматическим сохранением
-      setChats(prevChats => {
-        return prevChats.map(chat => {
-          if (chat.id === currentChatId) {
-            // Добавляем сообщение ассистента к существующим сообщениям чата
-            const currentMessages = chat.messages || [];
-            return {
-              ...chat,
-              messages: [...currentMessages, assistantMessage],
-            };
-          }
-          return chat;
+    // Генерируем ответ ассистента через streaming
+    const generateResponse = async () => {
+      try {
+        // Создаем сообщение-заглушку для ассистента, которое будем обновлять
+        const assistantMessageId = `assistant-${Date.now()}`;
+        const assistantMessage = {
+          id: assistantMessageId,
+          type: 'assistant',
+          text: '',
+          timestamp: new Date().toISOString(),
+        };
+        
+        // Добавляем пустое сообщение ассистента в локальное состояние и в чат
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        // Также добавляем в чат сразу
+        setChats(prevChats => {
+          return prevChats.map(chat => {
+            if (chat.id === currentChatId) {
+              return {
+                ...chat,
+                messages: [...(chat.messages || []), assistantMessage],
+              };
+            }
+            return chat;
+          });
         });
-      });
-    }, 1000);
+        
+        // Импортируем функцию для streaming
+        const { callOllamaStream } = await import('../api/callOllamaStream');
+        
+        // Собираем полный ответ по частям
+        let fullResponse = '';
+        
+        // Устанавливаем флаг, что мы обновляем сообщения вручную
+        isUpdatingMessagesRef.current = true;
+        
+        try {
+          console.log('Начало streaming ответа');
+          // Обрабатываем streaming ответ
+          for await (const chunk of callOllamaStream(text)) {
+            fullResponse += chunk;
+            console.log('Получен chunk, текущая длина ответа:', fullResponse.length);
+            
+            // Обновляем сообщение ассистента в реальном времени в обоих местах
+            const updatedMessage = { ...assistantMessage, text: fullResponse };
+            
+            setMessages(prev => {
+              const updated = prev.map(msg => {
+                if (msg.id === assistantMessageId) {
+                  return updatedMessage;
+                }
+                return msg;
+              });
+              console.log('Обновлены messages, количество:', updated.length);
+              return updated;
+            });
+            
+            // Также обновляем в чате
+            setChats(prevChats => {
+              return prevChats.map(chat => {
+                if (chat.id === currentChatId) {
+                  const updatedMessages = (chat.messages || []).map(msg => {
+                    if (msg.id === assistantMessageId) {
+                      return updatedMessage;
+                    }
+                    return msg;
+                  });
+                  return {
+                    ...chat,
+                    messages: updatedMessages,
+                  };
+                }
+                return chat;
+              });
+            });
+          }
+          console.log('Streaming завершен, полный ответ:', fullResponse.substring(0, 100) + '...');
+        } finally {
+          // Снимаем флаг после завершения streaming
+          isUpdatingMessagesRef.current = false;
+        }
+      } catch (error) {
+        // Сбрасываем флаг при ошибке
+        isUpdatingMessagesRef.current = false;
+        
+        console.error('Ошибка при получении ответа от сервера:', error);
+        // В случае ошибки добавляем сообщение об ошибке
+        const errorMessage = {
+          id: `assistant-error-${Date.now()}`,
+          type: 'assistant',
+          text: 'Извините, произошла ошибка при получении ответа. Попробуйте еще раз.',
+          timestamp: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, errorMessage]);
+        
+        // Также добавляем в чат
+        setChats(prevChats => {
+          return prevChats.map(chat => {
+            if (chat.id === currentChatId) {
+              const currentMessages = chat.messages || [];
+              return {
+                ...chat,
+                messages: [...currentMessages, errorMessage],
+              };
+            }
+            return chat;
+          });
+        });
+      }
+    };
+
+    generateResponse();
   }, [activeChatId, setChats]);
 
-  const generateMockResponse = (userText) => {
-    const responses = [
-      'Интересный сон... Давайте разберём его значение. Сны часто отражают наши внутренние переживания и эмоции. Что именно в этом сне вызвало у вас сильные чувства?',
-      'Это может означать несколько вещей. Сны о подобных ситуациях обычно связаны с нашими страхами, желаниями или нерешёнными вопросами. Попробуйте вспомнить детали — они могут быть важны.',
-      'Спасибо, что поделились. Интерпретация снов — это всегда индивидуальный процесс. Важно, какие эмоции вы испытывали во сне и после пробуждения. Что вы чувствовали?',
-      'Удивительно! Такой сон может символизировать переходный период в вашей жизни. Обратите внимание на цвета, которые вы видели — они часто несут важную информацию о вашем эмоциональном состоянии.',
-      'Интересная интерпретация... В сонниках подобные образы часто связаны с подсознательными желаниями. Попробуйте подумать: что этот сон может говорить о ваших невысказанных потребностях?',
-      'Сны — это язык нашего подсознания. То, что вы описали, может указывать на скрытые аспекты вашей личности или нерешённые конфликты. Какие ассоциации у вас возникают при воспоминании этого сна?',
-      'Очень символичный сон! Каждый элемент может иметь своё значение. Попробуйте разобрать его по частям: где вы находились, кто был рядом, какие действия происходили?',
-      'Это напоминает классический сюжет из сонников. Подобные сны часто приходят в моменты важных жизненных решений. Есть ли сейчас в вашей жизни ситуация, требующая выбора?',
-      'Интригующе! Сны такого типа могут быть предупреждением или подсказкой от вашего подсознания. Обратите внимание на повторяющиеся элементы — они особенно значимы.',
-      'Спасибо за доверие. Интерпретация снов требует внимания к деталям. Расскажите подробнее: какие звуки, запахи или тактильные ощущения вы помните? Это поможет глубже понять смысл.',
-      'Интересный образ! В различных традициях толкования снов подобные символы могут иметь разные значения. Что для вас лично означают эти образы? Ваша интуиция часто подсказывает верный ответ.',
-      'Сны — это мост между сознанием и подсознанием. То, что вы описали, может отражать ваши внутренние конфликты или невыраженные эмоции. Попробуйте вести дневник снов — это поможет увидеть закономерности.',
-      'Увлекательный сюжет! Подобные сны часто приходят, когда мы переживаем изменения в жизни. Связываете ли вы этот сон с какими-то событиями в реальности?',
-      'Каждый сон уникален, как и человек, который его видит. Важно не только то, что происходило во сне, но и как вы на это реагировали. Какие действия вы предпринимали во сне?',
-      'Это может быть отражением ваших творческих способностей или нереализованного потенциала. Сны часто показывают нам возможности, которые мы не замечаем в бодрствующем состоянии.',
-    ];
-    return responses[Math.floor(Math.random() * responses.length)];
-  };
-
   // Функция удаления чата
-  const deleteChat = useCallback((chatId) => {
+  const deleteChat = useCallback(async (chatId) => {
+    // Удаляем из локального состояния
     setChats(prevChats => prevChats.filter(chat => chat.id !== chatId));
     
     // Если удаляемый чат был активным, очищаем активный чат
@@ -152,18 +225,35 @@ export const useChat = (username) => {
       setActiveChatId(null);
       setMessages([]);
     }
-  }, [activeChatId, setChats]);
+    
+    // Удаляем из БД
+    if (deleteChatFromStorage) {
+      await deleteChatFromStorage(chatId).catch(err => 
+        console.warn('Не удалось удалить чат из БД:', err)
+      );
+    }
+  }, [activeChatId, setChats, deleteChatFromStorage]);
 
-  const activeChat = storedChats.find(chat => chat.id === activeChatId);
+  const activeChat = Array.isArray(storedChats) 
+    ? storedChats.find(chat => chat && chat.id === activeChatId)
+    : null;
 
   // Фильтруем чаты: показываем только те, у которых есть название (т.е. было хотя бы одно сообщение)
-  const visibleChats = storedChats.filter(chat => chat.title && chat.messages.length > 0);
+  const visibleChats = Array.isArray(storedChats)
+    ? storedChats.filter(chat => 
+        chat && 
+        chat.title && 
+        typeof chat.title === 'string' && 
+        Array.isArray(chat.messages) && 
+        chat.messages.length > 0
+      )
+    : [];
 
   return {
     chats: visibleChats,
     activeChatId,
     activeChat,
-    messages,
+    messages: Array.isArray(messages) ? messages : [],
     selectChat,
     sendMessage,
     createNewChat,

@@ -51,13 +51,17 @@ const ChatList = ({ chats, activeChatId, onSelectChat, onCreateNewChat, onDelete
 
   // Фильтруем чаты по поисковому запросу
   const filteredChats = useMemo(() => {
+    if (!Array.isArray(chats)) {
+      return [];
+    }
+    
     if (!searchQuery.trim()) {
       return chats;
     }
     
     const query = searchQuery.toLowerCase().trim();
     return chats.filter(chat => 
-      chat.title.toLowerCase().includes(query)
+      chat && chat.title && typeof chat.title === 'string' && chat.title.toLowerCase().includes(query)
     );
   }, [chats, searchQuery]);
 
@@ -135,7 +139,7 @@ const ChatList = ({ chats, activeChatId, onSelectChat, onCreateNewChat, onDelete
 
       {/* Список чатов */}
       <div className="flex-1 overflow-y-auto">
-        {chats.length === 0 ? (
+        {!chats || chats.length === 0 ? (
           <div className="p-4 text-center text-gray-400 text-sm">
             История диалогов пуста
           </div>
@@ -146,9 +150,16 @@ const ChatList = ({ chats, activeChatId, onSelectChat, onCreateNewChat, onDelete
         ) : (
           filteredChats.map((chat) => {
             // Получаем последнее сообщение для отображения
-            const lastMessage = chat.messages && chat.messages.length > 0
-              ? chat.messages[chat.messages.length - 1].text
-              : '';
+            let lastMessage = '';
+            if (chat.messages && Array.isArray(chat.messages) && chat.messages.length > 0) {
+              const lastMsg = chat.messages[chat.messages.length - 1];
+              if (lastMsg && lastMsg.text) {
+                // Убеждаемся, что text - это строка
+                lastMessage = typeof lastMsg.text === 'string' 
+                  ? lastMsg.text 
+                  : (typeof lastMsg.text === 'object' ? JSON.stringify(lastMsg.text) : String(lastMsg.text));
+              }
+            }
             
             const isHovered = hoveredChatId === chat.id;
             const isMenuOpen = menuOpenChatId === chat.id;
@@ -168,7 +179,7 @@ const ChatList = ({ chats, activeChatId, onSelectChat, onCreateNewChat, onDelete
                   onClick={() => onSelectChat(chat.id)}
                   className="w-full text-left p-4"
                 >
-                  <div className="font-medium text-white mb-1 pr-8">{chat.title}</div>
+                  <div className="font-medium text-white mb-1 pr-8">{chat.title || 'Без названия'}</div>
                   {lastMessage && (
                     <div className="text-sm text-gray-400 truncate pr-8">
                       {lastMessage}

@@ -44,21 +44,71 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Функция входа
-  const login = (username, email = null) => {
-    const userData = {
-      username,
-      email,
-      loggedAt: new Date().toISOString(),
-    };
-    
-    // Сохраняем токен авторизации в cookie
-    // Кодируем данные пользователя в base64 для простоты (в реальном приложении должен быть JWT токен)
-    const token = btoa(JSON.stringify(userData));
-    setCookie('authToken', token, 7); // Токен действителен 7 дней
-    
-    // Также сохраняем в localStorage для обратной совместимости (если нужно)
-    localStorage.setItem('currentUser', JSON.stringify(userData));
-    setUser(userData);
+  const login = async (username, password, email = null) => {
+    try {
+      // Пытаемся войти через API
+      const response = await fetch('http://localhost:2717/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username,
+          password: password || 'default' // Если пароль не передан, используем дефолтный
+        })
+      });
+
+      if (response.ok) {
+        const loginData = await response.json();
+        // Предполагаем, что API возвращает access_token
+        const accessToken = loginData.access_token || loginData.token || loginData;
+        
+        const userData = {
+          username,
+          email,
+          loggedAt: new Date().toISOString(),
+          access_token: accessToken
+        };
+        
+        // Сохраняем токен авторизации в cookie
+        const token = btoa(JSON.stringify(userData));
+        setCookie('authToken', token, 7);
+        
+        // Также сохраняем в localStorage для обратной совместимости
+        localStorage.setItem('currentUser', JSON.stringify(userData));
+        localStorage.setItem('authToken', token);
+        setUser(userData);
+        return userData;
+      } else {
+        // Если API недоступен или ошибка, используем локальную логику
+        console.warn('Не удалось войти через API, используем локальную аутентификацию');
+        const userData = {
+          username,
+          email,
+          loggedAt: new Date().toISOString(),
+        };
+        
+        const token = btoa(JSON.stringify(userData));
+        setCookie('authToken', token, 7);
+        localStorage.setItem('currentUser', JSON.stringify(userData));
+        setUser(userData);
+        return userData;
+      }
+    } catch (error) {
+      console.warn('Ошибка при входе через API, используем локальную аутентификацию:', error);
+      // Fallback на локальную логику
+      const userData = {
+        username,
+        email,
+        loggedAt: new Date().toISOString(),
+      };
+      
+      const token = btoa(JSON.stringify(userData));
+      setCookie('authToken', token, 7);
+      localStorage.setItem('currentUser', JSON.stringify(userData));
+      setUser(userData);
+      return userData;
+    }
   };
 
   // Функция регистрации

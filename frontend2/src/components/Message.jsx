@@ -2,6 +2,18 @@ import React from 'react';
 
 const Message = ({ message }) => {
   const isUser = message.type === 'user';
+  
+  // Убеждаемся, что text - это строка
+  let textContent = '';
+  if (message && message.text) {
+    if (typeof message.text === 'string') {
+      textContent = message.text;
+    } else if (typeof message.text === 'object') {
+      textContent = JSON.stringify(message.text);
+    } else {
+      textContent = String(message.text);
+    }
+  }
 
   return (
     <div
@@ -15,7 +27,7 @@ const Message = ({ message }) => {
         } shadow-lg`}
       >
         <div className="whitespace-pre-wrap text-sm leading-relaxed">
-          {message.text}
+          {textContent}
         </div>
         {message.timestamp && (
           <div className="text-xs text-gray-400 mt-2">
