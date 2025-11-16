@@ -2,19 +2,42 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 
 const AuthContext = createContext(null);
 
+// Вспомогательные функции для работы с cookies
+const getCookie = (name) => {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) {
+    return parts.pop().split(';').shift();
+  }
+  return null;
+};
+
+const setCookie = (name, value, days = 7) => {
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  document.cookie = `${name}=${value};expires=${expires.toUTCString()};path=/`;
+};
+
+const deleteCookie = (name) => {
+  document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;`;
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Загружаем пользователя из localStorage при монтировании
+  // Загружаем пользователя из cookie при монтировании
   useEffect(() => {
-    const storedUser = localStorage.getItem('currentUser');
-    if (storedUser) {
+    const authToken = getCookie('authToken');
+    if (authToken) {
       try {
-        setUser(JSON.parse(storedUser));
+        // Декодируем токен (предполагаем, что токен содержит данные пользователя в base64)
+        // В реальном приложении токен должен быть JWT или другим форматом
+        const decoded = JSON.parse(atob(authToken));
+        setUser(decoded);
       } catch (e) {
-        console.error('Ошибка при чтении пользователя из localStorage:', e);
-        localStorage.removeItem('currentUser');
+        console.error('Ошибка при чтении токена из cookie:', e);
+        deleteCookie('authToken');
       }
     }
     setLoading(false);
@@ -27,6 +50,13 @@ export const AuthProvider = ({ children }) => {
       email,
       loggedAt: new Date().toISOString(),
     };
+    
+    // Сохраняем токен авторизации в cookie
+    // Кодируем данные пользователя в base64 для простоты (в реальном приложении должен быть JWT токен)
+    const token = btoa(JSON.stringify(userData));
+    setCookie('authToken', token, 7); // Токен действителен 7 дней
+    
+    // Также сохраняем в localStorage для обратной совместимости (если нужно)
     localStorage.setItem('currentUser', JSON.stringify(userData));
     setUser(userData);
   };
@@ -40,6 +70,12 @@ export const AuthProvider = ({ children }) => {
       registeredAt: new Date().toISOString(),
       loggedAt: new Date().toISOString(),
     };
+    
+    // Сохраняем токен авторизации в cookie
+    const token = btoa(JSON.stringify(userData));
+    setCookie('authToken', token, 7);
+    
+    // Также сохраняем в localStorage для обратной совместимости
     localStorage.setItem('currentUser', JSON.stringify(userData));
     setUser(userData);
     return userData;
@@ -47,6 +83,7 @@ export const AuthProvider = ({ children }) => {
 
   // Функция выхода
   const logout = () => {
+    deleteCookie('authToken');
     localStorage.removeItem('currentUser');
     setUser(null);
   };

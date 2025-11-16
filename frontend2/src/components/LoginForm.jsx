@@ -245,10 +245,7 @@ const LoginForm = () => {
                 className="flex-1 bg-dark-panel/80 hover:bg-dark-panel text-white rounded-xl px-4 py-3 transition-all duration-200 flex items-center justify-center gap-2 border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <span className="text-sm">Войти через VK ID</span>
-                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-                  <rect x="2" y="2" width="20" height="20" rx="4" fill="#0077FF"/>
-                  <path d="M13.162 18.994c.609 0 .858-.406.851-.915-.008-.526-.282-.717-.653-1.177l-3.4-3.724c-.198-.217-.282-.326-.282-.566 0-.315.239-.566.653-.566.239 0 .413.109.653.326l2.956 2.543c.239.217.413.326.653.326.413 0 .653-.217.653-.566 0-.217-.044-.326-.239-.543l-2.956-2.543c-.198-.217-.282-.326-.653-.326-.413 0-.653.217-.653.566 0 .24.084.349.282.566l3.4 3.724c.37.46.653.651.653 1.177 0 .509-.242.915-.851.915H10.5c-.413 0-.653-.217-.653-.566 0-.315.24-.566.653-.566h2.662z" fill="white"/>
-                </svg>
+                <img src="/vk-logo.svg" alt="VK" className="w-5 h-5" />
               </button>
             </div>
 

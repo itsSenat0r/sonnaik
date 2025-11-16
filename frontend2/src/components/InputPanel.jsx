@@ -1,7 +1,70 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 const InputPanel = ({ onSendMessage }) => {
   const [inputValue, setInputValue] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  // Инициализация Speech Recognition API
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    
+    if (SpeechRecognition) {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'ru-RU';
+      recognition.continuous = false;
+      recognition.interimResults = false;
+
+      recognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        setInputValue(prev => prev + (prev ? ' ' : '') + transcript);
+        setIsListening(false);
+      };
+
+      recognition.onerror = (event) => {
+        console.error('Ошибка распознавания речи:', event.error);
+        setIsListening(false);
+        if (event.error === 'not-allowed') {
+          alert('Доступ к микрофону запрещён. Пожалуйста, разрешите доступ к микрофону в настройках браузера.');
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+
+      recognitionRef.current = recognition;
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, []);
+
+  const handleMicrophoneClick = () => {
+    if (!recognitionRef.current) {
+      alert('Ваш браузер не поддерживает распознавание речи. Пожалуйста, используйте современный браузер (Chrome, Edge).');
+      return;
+    }
+
+    if (isListening) {
+      recognitionRef.current.stop();
+      setIsListening(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        console.error('Ошибка запуска распознавания:', error);
+        setIsListening(false);
+      }
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -33,8 +96,13 @@ const InputPanel = ({ onSendMessage }) => {
             />
             <button
               type="button"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-              title="Голосовой ввод"
+              onClick={handleMicrophoneClick}
+              className={`absolute right-3 top-1/2 -translate-y-1/2 transition-colors ${
+                isListening 
+                  ? 'text-red-500 animate-pulse' 
+                  : 'text-gray-400 hover:text-white'
+              }`}
+              title={isListening ? "Остановить запись" : "Голосовой ввод"}
             >
               <svg
                 className="w-6 h-6"
